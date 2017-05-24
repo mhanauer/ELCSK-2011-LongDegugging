@@ -3,13 +3,4 @@ for ( j in 1:Nsubj ) {
   zbeta1[j] ~ dnorm( zbeta1mu , 1/(zbeta1sigma)^2 )
   zbeta2[j] ~ dnorm( zbeta2mu , 1/(zbeta2sigma)^2 )
   zbeta3[j] ~ dnorm( zbeta3mu , 1/(zbeta3sigma)^2 )
-  zbeta4[j] ~ dnorm( zbeta4mu , 1/(zbeta4sigma)^2 )
-  zbeta5[j] ~ dnorm( zbeta5mu , 1/(zbeta5sigma)^2 )
-  zbeta6[j] ~ dnorm( zbeta6mu , 1/(zbeta6sigma)^2 )
-  zbeta7[j] ~ dnorm( zbeta7mu , 1/(zbeta7sigma)^2 )
-  zbeta8[j] ~ dnorm( zbeta8mu , 1/(zbeta8sigma)^2 )
-  zbeta9[j] ~ dnorm( zbeta9mu , 1/(zbeta9sigma)^2 )
-  zbeta10[j] ~ dnorm( zbeta10mu , 1/(zbeta10sigma)^2 )
-  zbeta11[j] ~ dnorm( zbeta11mu , 1/(zbeta11sigma)^2 )
-  zbeta12[j] ~ dnorm( zbeta12mu , 1/(zbeta12sigma)^2 )
-  
+  }
