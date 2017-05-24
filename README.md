@@ -1,5 +1,13 @@
-# ELCSK-2011-LongDegugging
-genMCMC = function( data , xName="x" , x2Name = "X2", x3Name = "X3", x4Name = "X4", x5Name = "X5", x6Name = "X6", x7Name = "X7", x8Name = "X8", x9Name = "X9", x10Name = "X10", x11Name = "X11", x12Name = "X12", yName="y" , sName="s" ,
+# Jags-Ydich-XmetSsubj-Dicot-MrobustHier.R 
+# Accompanies the book:
+#  Kruschke, J. K. (2015). Doing Bayesian Data Analysis, Second Edition: 
+#  A Tutorial with R, JAGS, and Stan. Academic Press / Elsevier.
+# This has the most updated version but won't work
+source("DBDA2E-utilities.R")
+
+#===============================================================================
+
+genMCMC = function( data , xName="x" , x2Name = "x2",x3Name = "x3", yName="y" , sName="s" ,
                     numSavedSteps=10000 , thinSteps = 1 , saveName=NULL ,
                     runjagsMethod=runjagsMethodDefault , 
                     nChains=nChainsDefault) { 
@@ -10,15 +18,6 @@ genMCMC = function( data , xName="x" , x2Name = "X2", x3Name = "X3", x4Name = "X
   x = data[,xName]
   x2 = data[,x2Name]
   x3 = data[,x3Name]
-  x4 = data[,x4Name]
-  x5 = data[,x5Name]
-  x6 = data[,x6Name]
-  x7 = data[,x7Name]
-  x8 = data[,x8Name]
-  x9 = data[,x9Name]
-  x10 = data[,x10Name]
-  x11 = data[,x11Name]
-  x12 = data[,x12Name]
   # Convert sName to consecutive integers:
   s = as.numeric(factor(data[,sName]))
   # Do some checking that data make sense:
@@ -30,15 +29,109 @@ genMCMC = function( data , xName="x" , x2Name = "X2", x3Name = "X3", x4Name = "X
     x = x ,
     x2 = x2,
     x3 = x3,
-    x4 = x4,
-    x5 = x5,
-    x6 = x6,
-    x7 = x7,
-    x8 = x8,
-    x9 = x9,
-    x10 = x10,
-    x11 = x11,
-    x12 = x12,
     y = y ,
     s = s ,
     Nsubj = max(s)  # should equal length(unique(s))
+  )
+  #-----------------------------------------------------------------------------
+  # THE MODEL.
+  modelString = "
+  # Standardize the data:
+  data {
+  Ntotal <- length(y)
+  xm <- mean(x)
+  x2m <- mean(x2)
+  x3m <- mean(x3)
+  xsd <- sd(x)
+  x2sd <- sd(x2)
+  x3sd <- sd(x3)
+  
+  for ( i in 1:length(y) ) {
+  zx[i] <- ( x[i] - xm ) / xsd
+  zx2[i] <- ( x2[i] - x2m ) / x2sd
+  zx3[i] <- ( x3[i] - x3m ) / x3sd
+  }
+  }
+  # Specify the model for standardized data:
+  model {
+  for ( i in 1:Ntotal ) {
+  y[i] ~ dbern(mu[i]) 
+  mu[i] <- ( guess*(1/2) + (1.0-guess)*ilogit(zbeta0[s[i]] + zbeta1[s[i]] * zx[i] + zbeta2[s[i]] * zx2[i] + zbeta3[s[i]] * zx3[i]))
+  }
+  guess ~ dbeta(1,9)
+  for ( j in 1:Nsubj ) {
+  zbeta0[j] ~ dnorm( 0 , 1/(10)^2  )  
+  zbeta1[j] ~ dnorm( 0 , 1/(10)^2  )
+  zbeta2[j] ~ dnorm( 0 , 1/(10)^2  )
+  zbeta3[j] ~ dnorm( 0 , 1/(10)^2  )
+
+
+  }
+  # Priors vague on standardized scale:
+  zbeta0mu ~ dnorm( 0 , 1/(10)^2 )
+  zbeta1mu ~ dnorm( 0 , 1/(10)^2 )
+  zbeta2mu ~ dnorm( 0 , 1/(10)^2 )
+  zbeta3mu ~ dnorm( 0 , 1/(10)^2 )
+  
+  # Transform to original scale:
+  for ( j in 1:Nsubj ) {
+  beta1[j] <- zbeta1[j]  / xsd 
+  beta2[j] <- zbeta2[j]  / x2sd
+  beta3[j] <- zbeta3[j]  / x3sd
+  beta0[j] <- zbeta0[j]  - zbeta1[j] * xm / xsd + zbeta2[j] * x2m / x2sd + zbeta3[j] * x3m / x3sd
+  }
+  beta1mu <- zbeta1mu  / xsd
+  beta2mu <- zbeta2mu  / x2sd
+  beta3mu <- zbeta3mu  / x3sd
+  beta0mu <- zbeta0mu - zbeta1mu * xm / xsd + zbeta2mu * x2m / x2sd + zbeta3mu * x3m  / x3sd
+  }
+  " # close quote for modelString
+  # Write out modelString to a text file
+  writeLines( modelString , con="TEMPmodel.txt" )
+  #-----------------------------------------------------------------------------
+  # INTIALIZE THE CHAINS.
+  # Let JAGS do it...
+  #-----------------------------------------------------------------------------
+  # RUN THE CHAINS
+  parameters = c( "beta0" ,  "beta1","beta2" , "beta3", "beta0mu" , "beta1mu" , "beta2mu", "beta3mu",
+                  "zbeta0" , "zbeta1" , "zbeta2", "zbeta3",  "zbeta0mu" , "zbeta1mu" ,"zbeta2mu", "zbeta3mu")
+  adaptSteps = 1000  # Number of steps to "tune" the samplers
+  burnInSteps = 2000
+  runJagsOut <- run.jags( method=runjagsMethod ,
+                          model="TEMPmodel.txt" , 
+                          monitor=parameters , 
+                          data=dataList ,  
+                          #inits=initsList , 
+                          n.chains=nChains ,
+                          adapt=adaptSteps ,
+                          burnin=burnInSteps , 
+                          sample=ceiling(numSavedSteps/nChains) ,
+                          thin=thinSteps ,
+                          summarise=FALSE ,
+                          plots=FALSE )
+  codaSamples = as.mcmc.list( runJagsOut )
+  # resulting codaSamples object has these indices: 
+  #   codaSamples[[ chainIdx ]][ stepIdx , paramIdx ]
+  
+  if ( !is.null(saveName) ) {
+    save( codaSamples , file=paste(saveName,"Mcmc.Rdata",sep="") )
+  }
+  return( codaSamples )
+} # end function
+
+#===============================================================================
+
+smryMCMC = function(  codaSamples , 
+                      saveName=NULL ) {
+  mcmcMat = as.matrix(codaSamples,chains=FALSE)
+  paramNames = colnames(mcmcMat)
+  summaryInfo = NULL
+  for ( pName in paramNames ) {
+    summaryInfo = rbind( summaryInfo ,  summarizePost( mcmcMat[,pName] ) )
+  }
+  rownames(summaryInfo) = paramNames
+  if ( !is.null(saveName) ) {
+    write.csv( summaryInfo , file=paste(saveName,"SummaryInfo.csv",sep="") )
+  }
+  return( summaryInfo )
+}
